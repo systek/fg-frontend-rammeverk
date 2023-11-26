@@ -17,7 +17,7 @@ export const client = new Client({
 export async function initDb() {
   console.info("Running migrations if needed");
 
-  await client.connect();
+  await connectWithRetry();
 
   const authorsExistQuery = await client.query(`
         SELECT EXISTS (SELECT
@@ -46,5 +46,23 @@ export async function initDb() {
     }
   } else {
     console.info("Schema exists, skipping migrations");
+  }
+}
+
+async function connectWithRetry() {
+  let retry = 0;
+  while (true) {
+    try {
+      await client.connect();
+      break;
+    } catch (e) {
+      retry++;
+
+      if (retry > 3) throw e;
+      console.error(
+        `Unable to connect to database, retrying in 3 second (${retry}/3)`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
   }
 }
