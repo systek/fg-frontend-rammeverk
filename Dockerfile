@@ -5,7 +5,7 @@ WORKDIR /app
 COPY /bun.lockb /app
 COPY /package.json /app
 COPY /src /app
-COPY /src/db /app/db
+COPY /db /app/db
 
 RUN bun install --production
 

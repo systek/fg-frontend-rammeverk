@@ -2,8 +2,12 @@ import { Client } from "pg";
 import * as path from "path";
 import { cwd } from "node:process";
 
+const host = Bun.env.DOCKER_COMPOSE ? "db" : "localhost";
+
+console.info(`Database host is: ${host}`);
+
 export const client = new Client({
-  host: "localhost",
+  host: host,
   port: 5432,
   database: "postgres",
   user: "postgres",

@@ -3,7 +3,9 @@ services:
     build: .
     ports:
       - "5000:6969"
-  postgres:
+    environment:
+      - DOCKER_COMPOSE=true
+  db:
     image: "postgres:15"
     ports:
       - "5432:5432"

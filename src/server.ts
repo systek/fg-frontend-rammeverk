@@ -2,6 +2,8 @@ import { Elysia, t } from "elysia";
 import { client, initDb } from "./db.ts";
 import swagger from "@elysiajs/swagger";
 
+await initDb();
+
 const app = new Elysia()
   .use(swagger())
   .get(
@@ -26,10 +28,12 @@ const app = new Elysia()
       ),
     },
   )
-  .listen(6969);
+  .listen(6969)
+  .onStop(async () => {
+    console.log("Stopping server, closing database connection");
+    await client.end();
+  });
 
 console.log(
   `🦊 Elysia is running at ${app.server?.hostname}:${app.server?.port}`,
 );
-
-await initDb();
