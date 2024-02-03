@@ -17,10 +17,7 @@ describe('API sanity checks', () => {
   })
 
   test('GET /books', async () => {
-    const response = await fetch('http://localhost:6969/books')
-    const data = await response.json()
-
-    expect(data).toHaveLength(129)
+    expect(getAllBooks()).resolves.toHaveLength(129)
   })
 
   test('GET /author/:uuid', async () => {
@@ -118,7 +115,28 @@ describe('API sanity checks', () => {
     const authorBooksData = await authorBooksResponse.json()
     expect(authorBooksData).toHaveLength(1)
   })
+
+  test('DELETE /author/:uuid, should also delete all authors books', async () => {
+    expect(getAllBooks()).resolves.toHaveLength(129)
+
+    const response = await fetch('http://localhost:6969/authors')
+    const data = (await response.json()) as { uuid: string }[]
+    const authorUuid = data[0].uuid
+
+    const deleteResponse = await fetch(`http://localhost:6969/author/${authorUuid}`, {
+      method: 'DELETE',
+    })
+
+    expect(deleteResponse.status).toBe(200)
+    expect(getAllBooks()).resolves.toHaveLength(109)
+  })
 })
+
+async function getAllBooks(): Promise<{ title: string; published_date: string; isbn: string }[]> {
+  const response = await fetch('http://localhost:6969/books')
+
+  return (await response.json()) as { title: string; published_date: string; isbn: string }[]
+}
 
 async function serverReady(): Promise<void> {
   let waits = 0

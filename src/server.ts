@@ -115,19 +115,19 @@ const app = new Elysia()
       }
 
       await client.query('BEGIN')
-      const author = await client.query('SELECT * FROM authors WHERE uuid = $1', [uuid])
-      const id = author.rows[0].id
+      const authorQuery = await client.query<DbAuthor>('SELECT * FROM authors WHERE uuid = $1', [uuid])
+      const author = authorQuery.rows[0]
 
-      const deletedBooks = await client.query('DELETE FROM books WHERE author_id = $1', [id])
-      const deletedAuthor = await client.query('DELETE FROM authors WHERE id = $1', [id])
+      const deletedBooks = await client.query('DELETE FROM books WHERE author_id = $1', [author.id])
+      const deletedAuthor = await client.query('DELETE FROM authors WHERE id = $1', [author.id])
       await client.query('COMMIT')
 
       console.info(`Deleted ${deletedBooks.rowCount} books and ${deletedAuthor.rowCount} author`)
 
-      return { author_id: id }
+      return { uuid: author.uuid }
     },
     {
-      response: t.Nullable(t.Object({ author_id: t.String() })),
+      response: t.Nullable(t.Object({ uuid: t.String() })),
     },
   )
   .get(
