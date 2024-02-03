@@ -98,6 +98,30 @@ const app = new Elysia()
       ),
     },
   )
+  .delete(
+    'author/:id',
+    async ({ params: { id }, set }) => {
+      if (await client.query('SELECT * FROM authors WHERE author_id = $1', [id]).then((it) => it.rows.length === 0)) {
+        set.status = 'Not Found'
+        return null
+      }
+
+      await client.query('BEGIN')
+      const author = await client.query('SELECT * FROM authors WHERE author_id = $1', [id])
+      const authorId = author.rows[0].id
+
+      const deletedBooks = await client.query('DELETE FROM books WHERE author_id = $1', [authorId])
+      const deletedAuthor = await client.query('DELETE FROM authors WHERE id = $1', [authorId])
+      await client.query('COMMIT')
+
+      console.info(`Deleted ${deletedBooks.rowCount} books and ${deletedAuthor.rowCount} author`)
+
+      return { author_id: id }
+    },
+    {
+      response: t.Nullable(t.Object({ author_id: t.String() })),
+    },
+  )
   .get(
     'author/:id/books',
     async ({ params: { id } }) => {
