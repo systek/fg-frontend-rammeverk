@@ -4,19 +4,21 @@ import { cwd } from 'node:process'
 
 const host = Bun.env.DOCKER_COMPOSE ? 'db' : 'localhost'
 
-export const client = new Client({
-  host: host,
-  port: 5432,
-  database: 'postgres',
-  user: 'postgres',
-  password: 'postgres',
-})
+let _client: Client | null = null
+
+export function getClient(): Client {
+  if (_client == null) {
+    throw new Error('Database not initialized')
+  }
+
+  return _client
+}
 
 export async function initDb() {
+  console.info('Connecting to database')
+  const client = await connectWithRetry()
+
   console.info('Running migrations if needed')
-
-  await connectWithRetry()
-
   const authorsExistQuery = await client.query(`
         SELECT EXISTS (SELECT
                        FROM information_schema.tables
@@ -43,18 +45,36 @@ export async function initDb() {
   }
 }
 
+function createClient() {
+  console.info(`DB host is ${host}`)
+
+  return new Client({
+    host: host,
+    port: 5432,
+    database: 'postgres',
+    user: 'postgres',
+    password: 'postgres',
+  })
+}
+
 async function connectWithRetry() {
   let retry = 0
   while (true) {
     try {
-      await client.connect()
-      break
+      const freshClient = createClient()
+      await freshClient.connect()
+
+      console.info('Connected to successfully to database')
+
+      _client = freshClient
+
+      return _client
     } catch (e) {
       retry++
 
       if (retry > 3) throw e
-      console.error(`Unable to connect to database, retrying in 3 second (${retry}/3)`)
-      await new Promise((resolve) => setTimeout(resolve, 3000))
+      console.error(`Unable to connect to database, retrying in 10 second (${retry}/3)`)
+      await new Promise((resolve) => setTimeout(resolve, 5000))
     }
   }
 }

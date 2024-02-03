@@ -1,6 +1,10 @@
-import { test, describe, expect, beforeAll, beforeEach } from 'bun:test'
+import { test, describe, expect, beforeEach, beforeAll } from 'bun:test'
 
 describe('API sanity checks', () => {
+  beforeAll(async () => {
+    await serverReady()
+  })
+
   beforeEach(async () => {
     await fetch('http://localhost:6969/dev/re-seed', { method: 'POST' })
   })
@@ -115,3 +119,24 @@ describe('API sanity checks', () => {
     expect(authorBooksData).toHaveLength(1)
   })
 })
+
+async function serverReady(): Promise<void> {
+  let waits = 0
+  while (true) {
+    if (waits > 30) {
+      throw new Error('Server did not start in time')
+    }
+
+    try {
+      const res = await fetch('http://localhost:6969/dev/ready')
+      if (res.status === 200 && ((await res.json()) as { status: string }).status === 'ok') {
+        break
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      waits++
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+    }
+  }
+}

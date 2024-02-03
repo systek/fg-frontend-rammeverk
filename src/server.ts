@@ -1,5 +1,5 @@
 import { Elysia, t } from 'elysia'
-import { client, initDb } from './db.ts'
+import { getClient, initDb } from './db.ts'
 import swagger from '@elysiajs/swagger'
 import { DbAuthor, DbBook } from './db-types.ts'
 import path from 'path'
@@ -22,7 +22,7 @@ const app = new Elysia()
   .get(
     'authors',
     async () => {
-      const result = await client.query<DbAuthor>('SELECT * FROM authors')
+      const result = await getClient().query<DbAuthor>('SELECT * FROM authors')
 
       return result.rows.map((it) => ({
         uuid: it.uuid,
@@ -44,6 +44,7 @@ const app = new Elysia()
   .get(
     'author/:uuid',
     async ({ params: { uuid } }) => {
+      const client = getClient()
       const result = await client.query<DbAuthor>('SELECT * FROM authors WHERE uuid = $1', [uuid])
 
       if (result.rows.length === 0) {
@@ -76,6 +77,7 @@ const app = new Elysia()
   .post(
     'author',
     async ({ body, set }) => {
+      const client = getClient()
       if (await client.query('SELECT * FROM authors WHERE name = $1', [body.name]).then((it) => it.rows.length > 0)) {
         set.status = 'Conflict'
         return null
@@ -106,6 +108,7 @@ const app = new Elysia()
   .delete(
     'author/:uuid',
     async ({ params: { uuid }, set }) => {
+      const client = getClient()
       if (await client.query('SELECT * FROM authors WHERE uuid = $1', [uuid]).then((it) => it.rows.length === 0)) {
         set.status = 'Not Found'
         return null
@@ -130,7 +133,7 @@ const app = new Elysia()
   .get(
     'author/:uuid/books',
     async ({ params: { uuid } }) => {
-      const result = await client.query<Pick<DbBook, 'title' | 'published_date' | 'isbn'>>(
+      const result = await getClient().query<Pick<DbBook, 'title' | 'published_date' | 'isbn'>>(
         `SELECT title, published_date, isbn FROM books
                           LEFT JOIN authors a on a.id = books.author_id
                         WHERE a.uuid = $1`,
@@ -157,7 +160,7 @@ const app = new Elysia()
   .get(
     'books',
     async () => {
-      const result = await client.query<DbBook>('SELECT * FROM books')
+      const result = await getClient().query<DbBook>('SELECT * FROM books')
 
       return result.rows.map((it) => ({
         title: it.title,
@@ -179,6 +182,8 @@ const app = new Elysia()
   .post(
     'book',
     async ({ body, set }) => {
+      const client = getClient()
+
       if (await client.query('SELECT * FROM books WHERE isbn = $1', [body.isbn]).then((it) => it.rows.length > 0)) {
         set.status = 'Conflict'
         return null
@@ -210,6 +215,7 @@ const app = new Elysia()
     },
   )
   .post('dev/re-seed', async () => {
+    const client = getClient()
     await client.query('BEGIN')
     await client.query('DELETE FROM books')
     await client.query('DELETE FROM authors')
@@ -219,13 +225,16 @@ const app = new Elysia()
 
     return { success: true }
   })
+  .get('dev/ready', async () => {
+    return { status: 'ok' }
+  })
   .onError((err) => {
     console.error(err)
   })
 
 app.onStop(async () => {
   console.log('Stopping server, closing database connection')
-  await client.end()
+  await getClient().end()
 })
 
 app.listen(6969)
