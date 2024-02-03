@@ -30,7 +30,7 @@ const app = new Elysia()
     {
       response: t.Array(
         t.Object({
-          author_id: t.Numeric(),
+          author_id: t.String(),
           name: t.String(),
           bio: t.String(),
         }),
@@ -38,6 +38,64 @@ const app = new Elysia()
       ),
     },
   )
+  .get(
+    "author/:id",
+    async ({ params: { id } }) => {
+      const result = await client.query(
+        "SELECT * FROM authors WHERE author_id = $1",
+        [id],
+      );
+
+      if (result.rows.length === 0) {
+        return null;
+      }
+
+      const author = result.rows[0];
+      return {
+        author_id: author.author_id,
+        name: author.name,
+        bio: author.bio,
+      };
+    },
+    {
+      response: t.Nullable(
+        t.Object(
+          {
+            author_id: t.String(),
+            name: t.String(),
+            bio: t.String(),
+          },
+          { description: "Get author by UUID" },
+        ),
+      ),
+    },
+  )
+  .get(
+    "author/:id/books",
+    async ({ params: { id } }) => {
+      const result = await client.query(
+        `SELECT * FROM books LEFT JOIN authors a on a.id = books.author_id WHERE a.author_id = $1`,
+        [id],
+      );
+
+      return result.rows.map((it) => ({
+        title: it.title,
+        published_date: it.published_date.toISOString().slice(0, 10),
+        isbn: it.isbn,
+      }));
+    },
+    {
+      response: t.Array(
+        t.Object({
+          title: t.String(),
+          published_date: t.String({ description: "ISO8601 Date" }),
+          isbn: t.String(),
+        }),
+        { description: "Get all books for author by UUID" },
+      ),
+    },
+  )
+
   .get(
     "books",
     async () => {
