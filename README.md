@@ -1,15 +1,23 @@
 # fg-frontend-rammeverk
 
-To install dependencies:
+## Jeg workshopper og vil ha database og API
+
+Nice!
 
 ```bash
-bun install
+docker compose up
 ```
 
-To run:
+## Jeg vil gjøre endringer API-et
 
-```bash
-bun run src/server.ts
-```
+Enda nicere!
 
-This project was created using `bun init` in bun v1.0.14. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+1. Start postgressen:
+    ```bash
+    docker compose up db
+    ```
+2. Kjør bun serveren (i watch modus):
+    ```bash
+    bun install && bun run --watch src/server.ts
+    ```
+3. Gjør endringer i `src/server.ts` :-)
