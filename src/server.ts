@@ -1,6 +1,9 @@
 import { Elysia, t } from 'elysia'
 import { client, initDb } from './db.ts'
 import swagger from '@elysiajs/swagger'
+import { DbAuthor, DbBook } from './db-types.ts'
+import path from 'path'
+import { cwd } from 'node:process'
 
 await initDb()
 
@@ -19,10 +22,10 @@ const app = new Elysia()
   .get(
     'authors',
     async () => {
-      const result = await client.query('SELECT * FROM authors')
+      const result = await client.query<DbAuthor>('SELECT * FROM authors')
 
       return result.rows.map((it) => ({
-        author_id: it.author_id,
+        uuid: it.uuid,
         name: it.name,
         bio: it.bio,
       }))
@@ -30,7 +33,7 @@ const app = new Elysia()
     {
       response: t.Array(
         t.Object({
-          author_id: t.String(),
+          uuid: t.String(),
           name: t.String(),
           bio: t.String(),
         }),
@@ -39,9 +42,9 @@ const app = new Elysia()
     },
   )
   .get(
-    'author/:id',
-    async ({ params: { id } }) => {
-      const result = await client.query('SELECT * FROM authors WHERE author_id = $1', [id])
+    'author/:uuid',
+    async ({ params: { uuid } }) => {
+      const result = await client.query<DbAuthor>('SELECT * FROM authors WHERE uuid = $1', [uuid])
 
       if (result.rows.length === 0) {
         return null
@@ -50,7 +53,7 @@ const app = new Elysia()
       const author = result.rows[0]
       const publishedBooks = await client.query('SELECT COUNT(*) FROM books WHERE author_id = $1', [author.id])
       return {
-        author_id: author.author_id,
+        uuid: author.uuid,
         name: author.name,
         bio: author.bio,
         published_books: +publishedBooks.rows[0].count,
@@ -60,7 +63,7 @@ const app = new Elysia()
       response: t.Nullable(
         t.Object(
           {
-            author_id: t.String(),
+            uuid: t.String(),
             name: t.String(),
             bio: t.String(),
             published_books: t.Number({ description: 'Number of published books' }),
@@ -78,13 +81,15 @@ const app = new Elysia()
         return null
       }
 
-      const newAuthor = await client.query('INSERT INTO authors (name, bio) VALUES ($1, $2) RETURNING author_id', [
-        body.name,
-        body.bio,
-      ])
+      const newAuthor = await client.query<{ uuid: string }>(
+        'INSERT INTO authors (name, bio) VALUES ($1, $2) RETURNING uuid',
+        [body.name, body.bio],
+      )
 
-      const newAuthorId: string = newAuthor.rows[0].author_id
-      return { author_id: newAuthorId }
+      set.status = 'Created'
+
+      const newAuthorId: string = newAuthor.rows[0].uuid
+      return { uuid: newAuthorId }
     },
     {
       body: t.Object({
@@ -93,25 +98,25 @@ const app = new Elysia()
       }),
       response: t.Nullable(
         t.Object({
-          author_id: t.String(),
+          uuid: t.String(),
         }),
       ),
     },
   )
   .delete(
-    'author/:id',
-    async ({ params: { id }, set }) => {
-      if (await client.query('SELECT * FROM authors WHERE author_id = $1', [id]).then((it) => it.rows.length === 0)) {
+    'author/:uuid',
+    async ({ params: { uuid }, set }) => {
+      if (await client.query('SELECT * FROM authors WHERE uuid = $1', [uuid]).then((it) => it.rows.length === 0)) {
         set.status = 'Not Found'
         return null
       }
 
       await client.query('BEGIN')
-      const author = await client.query('SELECT * FROM authors WHERE author_id = $1', [id])
-      const authorId = author.rows[0].id
+      const author = await client.query('SELECT * FROM authors WHERE uuid = $1', [uuid])
+      const id = author.rows[0].id
 
-      const deletedBooks = await client.query('DELETE FROM books WHERE author_id = $1', [authorId])
-      const deletedAuthor = await client.query('DELETE FROM authors WHERE id = $1', [authorId])
+      const deletedBooks = await client.query('DELETE FROM books WHERE author_id = $1', [id])
+      const deletedAuthor = await client.query('DELETE FROM authors WHERE id = $1', [id])
       await client.query('COMMIT')
 
       console.info(`Deleted ${deletedBooks.rowCount} books and ${deletedAuthor.rowCount} author`)
@@ -123,14 +128,13 @@ const app = new Elysia()
     },
   )
   .get(
-    'author/:id/books',
-    async ({ params: { id } }) => {
-      const result = await client.query(
-        `SELECT *
-                 FROM books
+    'author/:uuid/books',
+    async ({ params: { uuid } }) => {
+      const result = await client.query<Pick<DbBook, 'title' | 'published_date' | 'isbn'>>(
+        `SELECT title, published_date, isbn FROM books
                           LEFT JOIN authors a on a.id = books.author_id
-                 WHERE a.author_id = $1`,
-        [id],
+                        WHERE a.uuid = $1`,
+        [uuid],
       )
 
       return result.rows.map((it) => ({
@@ -153,7 +157,7 @@ const app = new Elysia()
   .get(
     'books',
     async () => {
-      const result = await client.query('SELECT * FROM books')
+      const result = await client.query<DbBook>('SELECT * FROM books')
 
       return result.rows.map((it) => ({
         title: it.title,
@@ -180,13 +184,15 @@ const app = new Elysia()
         return null
       }
 
-      const author = await client.query('SELECT * FROM authors WHERE author_id = $1', [body.author_id])
-      const newBook = await client.query(
-        'INSERT INTO books (isbn, title, published_date, author_id) VALUES ($1, $2, $3, $4) RETURNING book_id',
+      const author = await client.query<DbAuthor>('SELECT * FROM authors WHERE uuid = $1', [body.author_uuid])
+      const newBook = await client.query<Pick<DbBook, 'uuid'>>(
+        'INSERT INTO books (isbn, title, published_date, author_id) VALUES ($1, $2, $3, $4) RETURNING uuid',
         [body.isbn, body.title, body.published_date, author.rows[0].id],
       )
 
-      const newBookId: string = newBook.rows[0].book_id
+      set.status = 'Created'
+
+      const newBookId: string = newBook.rows[0].uuid
       return { book_id: newBookId }
     },
     {
@@ -194,7 +200,7 @@ const app = new Elysia()
         isbn: t.String(),
         title: t.String(),
         published_date: t.String({ description: 'ISO8601 Date' }),
-        author_id: t.String({ description: 'UUID of author' }),
+        author_uuid: t.String({ description: 'UUID of author' }),
       }),
       response: t.Nullable(
         t.Object({
@@ -203,6 +209,16 @@ const app = new Elysia()
       ),
     },
   )
+  .post('dev/re-seed', async () => {
+    await client.query('BEGIN')
+    await client.query('DELETE FROM books')
+    await client.query('DELETE FROM authors')
+    await client.query('ALTER SEQUENCE authors_id_seq RESTART WITH 1')
+    await client.query(await Bun.file(path.join(cwd(), 'db', 'seed.sql')).text())
+    await client.query('COMMIT')
+
+    return { success: true }
+  })
   .onError((err) => {
     console.error(err)
   })
