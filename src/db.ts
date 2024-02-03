@@ -4,8 +4,6 @@ import { cwd } from "node:process";
 
 const host = Bun.env.DOCKER_COMPOSE ? "db" : "localhost";
 
-console.info(`Database host is: ${host}`);
-
 export const client = new Client({
   host: host,
   port: 5432,
