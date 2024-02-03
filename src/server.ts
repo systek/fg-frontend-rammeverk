@@ -74,7 +74,10 @@ const app = new Elysia()
     "author/:id/books",
     async ({ params: { id } }) => {
       const result = await client.query(
-        `SELECT * FROM books LEFT JOIN authors a on a.id = books.author_id WHERE a.author_id = $1`,
+        `SELECT *
+                 FROM books
+                          LEFT JOIN authors a on a.id = books.author_id
+                 WHERE a.author_id = $1`,
         [id],
       );
 
@@ -95,7 +98,6 @@ const app = new Elysia()
       ),
     },
   )
-
   .get(
     "books",
     async () => {
@@ -116,6 +118,36 @@ const app = new Elysia()
         }),
         { description: "Get all books" },
       ),
+    },
+  )
+  .put(
+    "book",
+    async ({ body, set }) => {
+      // if isbn already exists
+      if (
+        await client
+          .query("SELECT * FROM books WHERE isbn = $1", [body.isbn])
+          .then((it) => it.rows.length > 0)
+      ) {
+        set.status = "Conflict";
+        return;
+      }
+      const author = await client.query(
+        "SELECT * FROM authors WHERE author_id = $1",
+        [body.author_id],
+      );
+      await client.query(
+        "INSERT INTO books (isbn, title, published_date, author_id) VALUES ($1, $2, $3, $4)",
+        [body.isbn, body.title, body.published_date, author.rows[0].id],
+      );
+    },
+    {
+      body: t.Object({
+        isbn: t.String(),
+        title: t.String(),
+        published_date: t.String({ description: "ISO8601 Date" }),
+        author_id: t.String({ description: "UUID of author" }),
+      }),
     },
   )
   .onError((err) => {
