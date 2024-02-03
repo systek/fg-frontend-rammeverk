@@ -48,10 +48,12 @@ const app = new Elysia()
       }
 
       const author = result.rows[0]
+      const publishedBooks = await client.query('SELECT COUNT(*) FROM books WHERE author_id = $1', [author.id])
       return {
         author_id: author.author_id,
         name: author.name,
         bio: author.bio,
+        published_books: +publishedBooks.rows[0].count,
       }
     },
     {
@@ -61,9 +63,38 @@ const app = new Elysia()
             author_id: t.String(),
             name: t.String(),
             bio: t.String(),
+            published_books: t.Number({ description: 'Number of published books' }),
           },
           { description: 'Get author by UUID' },
         ),
+      ),
+    },
+  )
+  .post(
+    'author',
+    async ({ body, set }) => {
+      if (await client.query('SELECT * FROM authors WHERE name = $1', [body.name]).then((it) => it.rows.length > 0)) {
+        set.status = 'Conflict'
+        return null
+      }
+
+      const newAuthor = await client.query('INSERT INTO authors (name, bio) VALUES ($1, $2) RETURNING author_id', [
+        body.name,
+        body.bio,
+      ])
+
+      const newAuthorId: string = newAuthor.rows[0].author_id
+      return { author_id: newAuthorId }
+    },
+    {
+      body: t.Object({
+        name: t.String(),
+        bio: t.String(),
+      }),
+      response: t.Nullable(
+        t.Object({
+          author_id: t.String(),
+        }),
       ),
     },
   )
@@ -117,21 +148,22 @@ const app = new Elysia()
       ),
     },
   )
-  .put(
+  .post(
     'book',
     async ({ body, set }) => {
-      // if isbn already exists
       if (await client.query('SELECT * FROM books WHERE isbn = $1', [body.isbn]).then((it) => it.rows.length > 0)) {
         set.status = 'Conflict'
-        return
+        return null
       }
+
       const author = await client.query('SELECT * FROM authors WHERE author_id = $1', [body.author_id])
-      await client.query('INSERT INTO books (isbn, title, published_date, author_id) VALUES ($1, $2, $3, $4)', [
-        body.isbn,
-        body.title,
-        body.published_date,
-        author.rows[0].id,
-      ])
+      const newBook = await client.query(
+        'INSERT INTO books (isbn, title, published_date, author_id) VALUES ($1, $2, $3, $4) RETURNING book_id',
+        [body.isbn, body.title, body.published_date, author.rows[0].id],
+      )
+
+      const newBookId: string = newBook.rows[0].book_id
+      return { book_id: newBookId }
     },
     {
       body: t.Object({
@@ -140,6 +172,11 @@ const app = new Elysia()
         published_date: t.String({ description: 'ISO8601 Date' }),
         author_id: t.String({ description: 'UUID of author' }),
       }),
+      response: t.Nullable(
+        t.Object({
+          book_id: t.String(),
+        }),
+      ),
     },
   )
   .onError((err) => {
