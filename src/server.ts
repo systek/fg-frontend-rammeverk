@@ -214,6 +214,20 @@ const app = new Elysia()
       ),
     },
   )
+  .delete('book/:isbn', async ({ params: { isbn }, set }) => {
+    const client = getClient()
+
+    if (await client.query('SELECT * FROM books where isbn = $1', [isbn]).then((it) => it.rows.length === 0)) {
+      set.status = 'Not Found'
+      return null
+    }
+
+    await client.query('DELETE FROM books WHERE isbn = $1', [isbn])
+
+    console.info(`Deleted book with ISBN ${isbn}`)
+
+    return { isbn }
+  })
   .post('dev/re-seed', async () => {
     const client = getClient()
     await client.query('BEGIN')
