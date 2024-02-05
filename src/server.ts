@@ -228,6 +228,42 @@ const app = new Elysia()
 
     return { isbn }
   })
+  .put(
+    'book/:isbn',
+    async ({ params: { isbn }, body, set }) => {
+      const client = getClient()
+
+      const isbnRegex = /^(?=(?:\D*\d){10}(?:(?:\D*\d){3})?$)[\d-]+$/
+      if (!isbnRegex.test(body.isbn)) {
+        set.status = 'Bad Request'
+        return null
+      }
+
+      const result = await client.query<Pick<DbBook, 'isbn' | 'published_date' | 'title'>>(
+        'UPDATE books SET isbn = $1, title = $2, published_date = $3 WHERE isbn = $4 RETURNING isbn, title, published_date',
+        [body.isbn, body.title, body.published_date, isbn],
+      )
+
+      if (result.rows.length === 0) return null
+
+      const updatedBook = result.rows[0]
+      return updatedBook
+    },
+    {
+      response: t.Nullable(
+        t.Object({
+          isbn: t.String(),
+          title: t.String(),
+          published_date: t.Date({ description: 'ISO8601 Date' }),
+        }),
+      ),
+      body: t.Object({
+        isbn: t.String(),
+        title: t.String(),
+        published_date: t.String({ description: 'ISO8601 Date' }),
+      }),
+    },
+  )
   .post('dev/re-seed', async () => {
     const client = getClient()
     await client.query('BEGIN')
