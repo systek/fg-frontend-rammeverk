@@ -12,6 +12,8 @@ docker compose up
 
 Enda nicere!
 
+Du må ha [bun.sh](https://bun.sh/) installert.
+
 1. Start postgressen:
     ```bash
     docker compose up db
