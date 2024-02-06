@@ -8,7 +8,7 @@ Nice!
 docker compose up
 ```
 
-## Jeg vil gjøre endringer API-et
+## Jeg vil gjøre endringer i API-et
 
 Enda nicere!
 
@@ -16,7 +16,7 @@ Enda nicere!
     ```bash
     docker compose up db
     ```
-2. Kjør bun serveren (i watch modus):
+2. Kjør bun-serveren (i watch-modus):
     ```bash
     bun install && bun run --watch src/server.ts
     ```
