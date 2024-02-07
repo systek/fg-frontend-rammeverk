@@ -73,7 +73,7 @@ async function connectWithRetry() {
       retry++
 
       if (retry > 3) throw e
-      console.error(`Unable to connect to database, retrying in 10 second (${retry}/3)`)
+      console.error(`Unable to connect to database, retrying in 5 seconds (${retry}/3)`)
       await new Promise((resolve) => setTimeout(resolve, 5000))
     }
   }
