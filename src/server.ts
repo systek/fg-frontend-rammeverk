@@ -7,6 +7,9 @@ import { cwd } from 'node:process'
 
 await initDb()
 
+let slowness = 1000
+let jitter = 300
+
 const app = new Elysia()
   .use(
     swagger({
@@ -19,6 +22,9 @@ const app = new Elysia()
       },
     }),
   )
+  .onBeforeHandle(async (ctx) => {
+    await new Promise((resolve) => setTimeout(resolve, slowness + Math.random() * jitter))
+  })
   .get(
     'authors',
     async () => {
@@ -277,6 +283,11 @@ const app = new Elysia()
   })
   .get('dev/ready', async () => {
     return { status: 'ok' }
+  })
+  .post('dev/slowness/:ms/:jitter', async ({ params }) => {
+    slowness = +params.ms
+    jitter = +params.jitter
+    return { status: `Set slowness to ${slowness} and jitter to ${jitter}` }
   })
   .onError((err) => {
     console.error(err)
